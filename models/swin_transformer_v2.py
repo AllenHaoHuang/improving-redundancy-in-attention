@@ -89,6 +89,11 @@ class WindowAttention(nn.Module):
 
         self.logit_scale = nn.Parameter(torch.log(10 * torch.ones((num_heads, 1, 1))), requires_grad=True)
 
+        # mlp to generate continuous relative position weight
+        self.cpw_mlp = nn.Sequential(nn.Linear(2, 512, bias=True),
+                                     nn.ReLU(inplace=True),
+                                     nn.Linear(512, num_heads, bias=False))
+
         # mlp to generate continuous relative position bias
         self.cpb_mlp = nn.Sequential(nn.Linear(2, 512, bias=True),
                                      nn.ReLU(inplace=True),
@@ -157,7 +162,13 @@ class WindowAttention(nn.Module):
         # cosine attention
         attn = (F.normalize(q, dim=-1) @ F.normalize(k, dim=-1).transpose(-2, -1))
         logit_scale = torch.clamp(self.logit_scale, max=torch.log(torch.tensor(1. / 0.01))).exp()
-        attn = attn * logit_scale
+
+        relative_position_weight_table = self.cpw_mlp(self.relative_coords_table).view(-1, self.num_heads)
+        relative_position_weight = relative_position_weight_table[self.relative_position_index.view(-1)].view(
+            self.window_size[0] * self.window_size[1], self.window_size[0] * self.window_size[1], -1)  # Wh*Ww,Wh*Ww,nH
+        relative_position_weight = relative_position_weight.permute(2, 0, 1).contiguous()  # nH, Wh*Ww, Wh*Ww
+        relative_position_weight = 16 * torch.sigmoid(relative_position_weight)
+        attn = attn * (logit_scale + relative_position_weight)
 
         relative_position_bias_table = self.cpb_mlp(self.relative_coords_table).view(-1, self.num_heads)
         relative_position_bias = relative_position_bias_table[self.relative_position_index.view(-1)].view(
@@ -605,7 +616,7 @@ class SwinTransformerV2(nn.Module):
 
     @torch.jit.ignore
     def no_weight_decay_keywords(self):
-        return {"cpb_mlp", "logit_scale", 'relative_position_bias_table'}
+        return {"cpb_mlp", "cpw_mlp", "logit_scale", 'relative_position_bias_table'}
 
     def forward_features(self, x):
         x = self.patch_embed(x)
