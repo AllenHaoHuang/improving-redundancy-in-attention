@@ -46,7 +46,8 @@ def build_model(config):
                                   patch_norm=config.MODEL.SWINV2.PATCH_NORM,
                                   use_checkpoint=config.TRAIN.USE_CHECKPOINT,
                                   pretrained_window_sizes=config.MODEL.SWINV2.PRETRAINED_WINDOW_SIZES,
-                                  pre_mlp=config.MODEL.SWINV2.PRE_MLP)
+                                  pre_mlp=config.MODEL.SWINV2.PRE_MLP,
+                                  sw_mlp=config.MODEL.SWINV2.SW_MLP)
     elif model_type == 'swin_mlp':
         model = SwinMLP(img_size=config.DATA.IMG_SIZE,
                         patch_size=config.MODEL.SWIN_MLP.PATCH_SIZE,
