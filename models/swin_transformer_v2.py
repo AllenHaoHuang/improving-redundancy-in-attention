@@ -410,10 +410,11 @@ class BasicLayer(nn.Module):
     def __init__(self, dim, input_resolution, depth, num_heads, window_size,
                  mlp_ratio=4., qkv_bias=True, drop=0., attn_drop=0.,
                  drop_path=0., norm_layer=nn.LayerNorm, downsample=None, use_checkpoint=False,
-                 pretrained_window_size=0):
+                 pretrained_window_size=0, pre_mlp=False):
 
         super().__init__()
         self.dim = dim
+        self.mlp_ratio = mlp_ratio
         self.input_resolution = input_resolution
         self.depth = depth
         self.use_checkpoint = use_checkpoint
@@ -437,7 +438,18 @@ class BasicLayer(nn.Module):
         else:
             self.downsample = None
 
+        # pre norm and mlp
+        if pre_mlp:
+            self.pre_norm = norm_layer(dim)
+            mlp_hidden_dim = int(dim * mlp_ratio)
+            self.pre_mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=nn.GELU, drop=drop)
+        else:
+            self.pre_norm = None
+            self.pre_mlp = None
+
     def forward(self, x):
+        if self.pre_mlp is not None:
+            x = x + self.pre_mlp(self.pre_norm(x))
         for blk in self.blocks:
             if self.use_checkpoint:
                 x = checkpoint.checkpoint(blk, x)
@@ -452,6 +464,10 @@ class BasicLayer(nn.Module):
 
     def flops(self):
         flops = 0
+        if self.pre_mlp is not None:
+            H, W = self.input_resolution
+            # mlp
+            flops += 2 * H * W * self.dim * self.dim * self.mlp_ratio
         for blk in self.blocks:
             flops += blk.flops()
         if self.downsample is not None:
@@ -545,7 +561,7 @@ class SwinTransformerV2(nn.Module):
                  window_size=7, mlp_ratio=4., qkv_bias=True,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
                  norm_layer=nn.LayerNorm, ape=False, patch_norm=True,
-                 use_checkpoint=False, pretrained_window_sizes=[0, 0, 0, 0], **kwargs):
+                 use_checkpoint=False, pretrained_window_sizes=[0, 0, 0, 0], pre_mlp=False, **kwargs):
         super().__init__()
 
         self.num_classes = num_classes
@@ -590,7 +606,8 @@ class SwinTransformerV2(nn.Module):
                                norm_layer=norm_layer,
                                downsample=PatchMerging if (i_layer < self.num_layers - 1) else None,
                                use_checkpoint=use_checkpoint,
-                               pretrained_window_size=pretrained_window_sizes[i_layer])
+                               pretrained_window_size=pretrained_window_sizes[i_layer],
+                               pre_mlp=pre_mlp)
             self.layers.append(layer)
 
         self.norm = norm_layer(self.num_features)
