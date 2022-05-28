@@ -458,13 +458,15 @@ class BasicLayer(nn.Module):
             self.pre_norm = norm_layer(dim)
             mlp_hidden_dim = int(dim * mlp_ratio)
             self.pre_mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=nn.GELU, drop=drop)
+            self.pre_drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         else:
             self.pre_norm = None
             self.pre_mlp = None
+            self.pre_drop_path = None
 
     def forward(self, x):
         if self.pre_mlp is not None:
-            x = x + self.pre_mlp(self.pre_norm(x))
+            x = x + self.pre_drop_path(self.pre_mlp(self.pre_norm(x)))
         for blk in self.blocks:
             if self.use_checkpoint:
                 x = checkpoint.checkpoint(blk, x)
