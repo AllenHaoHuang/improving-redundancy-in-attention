@@ -1,0 +1,15 @@
+DATA:
+  IMG_SIZE: 256
+MODEL:
+  TYPE: swinv2
+  NAME: swinv2_tiny_patch4_window8_256_premlp0_msamlp2
+  DROP_PATH_RATE: 0.0
+  SWINV2:
+    EMBED_DIM: 384
+    NUM_HEADS: [ 12 ]
+    WINDOW_SIZE: 8
+    PRE_MLP: False
+    DEPTHS: [ 2 ]
+    MLP_RATIO: 2.
+TRAIN:
+  EPOCHS: 100

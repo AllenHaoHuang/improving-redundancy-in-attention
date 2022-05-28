@@ -458,7 +458,11 @@ class BasicLayer(nn.Module):
             self.pre_norm = norm_layer(dim)
             mlp_hidden_dim = int(dim * mlp_ratio)
             self.pre_mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=nn.GELU, drop=drop)
-            self.pre_drop_path = DropPath(drop_path[0]) if drop_path[0] > 0. else nn.Identity()
+            # TODO remove once buildup experiments are over
+            if drop_path == []:
+                self.pre_drop_path = nn.Identity()
+            else:
+                self.pre_drop_path = DropPath(drop_path[0]) if drop_path[0] > 0. else nn.Identity()
         else:
             self.pre_norm = None
             self.pre_mlp = None
