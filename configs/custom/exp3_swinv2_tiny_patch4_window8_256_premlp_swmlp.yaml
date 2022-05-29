@@ -2,7 +2,7 @@ DATA:
   IMG_SIZE: 256
 MODEL:
   TYPE: swinv2
-  NAME: swinv2_tiny_patch4_window8_256
+  NAME: swinv2_tiny_patch4_window8_256_premlp_swinmlp
   DROP_PATH_RATE: 0.2
   SWINV2:
     EMBED_DIM: 96
