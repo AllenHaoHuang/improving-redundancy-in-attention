@@ -42,12 +42,12 @@ represent the identity matrix.
 ### Current Results on Original Swin Transformer
 
 
-|  name   | QK residual | CRPW | Pre MLP | resolution | acc@1 | acc@5 | #params | FLOPs |
-|:-------:|:-----------:|:----:|:-------:|:----------:|:-----:|:-----:|:-------:|:-----:|
-| Swin-T  |     No      |  No  |   No    |  224x224   | 81.3  | 95.5  |   28M   | 4.5G  |
-| Swin-T  |     Yes     |  No  |   No    |  224x224   | 81.4  | 95.5  |   28M   | 4.5G  |
-| Swin-T  |     Yes     | Yes  |   No    |  224x224   | 81.6  | 95.6  |   28M   | 4.5G  | 
-| Swin-T  |     Yes     | Yes  |   Yes   |  224x224   | 81.8  | 95.8  |   28M   | 4.5G  |
+|  name   | QK residual | CRPW | Pre MLP | resolution | acc@1 | acc@5 | #params | FLOPs |                          ImageNet 1K logs                           |
+|:-------:|:-----------:|:----:|:-------:|:----------:|:-----:|:-----:|:-------:|:-----:|:-------------------------------------------------------------------:|
+| Swin-T  |     No      |  No  |   No    |  224x224   | 81.3  | 95.5  |   28M   | 4.5G  |          [logs](logs/log_swin_tiny_patch4_window7_224.txt)          |
+| Swin-T  |     Yes     |  No  |   No    |  224x224   | 81.4  | 95.5  |   28M   | 4.5G  |                                                                     |
+| Swin-T  |     Yes     | Yes  |   No    |  224x224   | 81.6  | 95.6  |   28M   | 4.5G  |    [logs](logs/log_swin_tiny_patch4_window7_224_qkres_crpw.txt)     | 
+| Swin-T  |     Yes     | Yes  |   Yes   |  224x224   | 81.8  | 95.8  |   28M   | 4.5G  | [logs](logs/log_swin_tiny_patch4_window7_224_qkres_crpw_premlp.txt) |
 
 
 
