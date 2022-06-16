@@ -167,7 +167,7 @@ class WindowAttention(nn.Module):
         relative_position_weight = relative_position_weight_table[self.relative_position_index.view(-1)].view(
             self.window_size[0] * self.window_size[1], self.window_size[0] * self.window_size[1], -1)  # Wh*Ww,Wh*Ww,nH
         relative_position_weight = relative_position_weight.permute(2, 0, 1).contiguous()  # nH, Wh*Ww, Wh*Ww
-        relative_position_weight = 16 * torch.sigmoid(relative_position_weight)
+        # relative_position_weight = 16 * torch.sigmoid(relative_position_weight)
         attn = attn * (logit_scale + relative_position_weight)
 
         relative_position_bias_table = self.cpb_mlp(self.relative_coords_table).view(-1, self.num_heads)
