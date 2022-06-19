@@ -54,4 +54,3 @@ represent the identity matrix.
 ### TODO
 - Run experiments for SwinV2
 - (Experimental) Pre MLP for each resolution 
-- (Experimental) S.W. MLP 

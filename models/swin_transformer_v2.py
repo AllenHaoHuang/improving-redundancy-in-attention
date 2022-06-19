@@ -174,7 +174,7 @@ class WindowAttention(nn.Module):
         relative_position_bias = relative_position_bias_table[self.relative_position_index.view(-1)].view(
             self.window_size[0] * self.window_size[1], self.window_size[0] * self.window_size[1], -1)  # Wh*Ww,Wh*Ww,nH
         relative_position_bias = relative_position_bias.permute(2, 0, 1).contiguous()  # nH, Wh*Ww, Wh*Ww
-        relative_position_bias = 16 * torch.sigmoid(relative_position_bias)
+        # relative_position_bias = 16 * torch.sigmoid(relative_position_bias)
         attn = attn + relative_position_bias.unsqueeze(0)
 
         if mask is not None:
@@ -231,7 +231,7 @@ class SwinTransformerBlock(nn.Module):
 
     def __init__(self, dim, input_resolution, num_heads, window_size=7, shift_size=0,
                  mlp_ratio=4., qkv_bias=True, drop=0., attn_drop=0., drop_path=0.,
-                 act_layer=nn.GELU, norm_layer=nn.LayerNorm, pretrained_window_size=0, sw_mlp=False):
+                 act_layer=nn.GELU, norm_layer=nn.LayerNorm, pretrained_window_size=0):
         super().__init__()
         self.dim = dim
         self.input_resolution = input_resolution
@@ -239,11 +239,9 @@ class SwinTransformerBlock(nn.Module):
         self.window_size = window_size
         self.shift_size = shift_size
         self.mlp_ratio = mlp_ratio
-        self.sw_mlp = sw_mlp
         if min(self.input_resolution) <= self.window_size:
             # if window size is larger than input resolution, we don't partition windows
             self.shift_size = 0
-            self.sw_mlp = False
             self.window_size = min(self.input_resolution)
         assert 0 <= self.shift_size < self.window_size, "shift_size must in 0-window_size"
 
@@ -316,20 +314,8 @@ class SwinTransformerBlock(nn.Module):
         x = x.view(B, H * W, C)
         x = shortcut + self.drop_path(self.norm1(x))
 
-        # cyclic shift
-        if self.sw_mlp and self.shift_size == 0:
-            shifted_x = torch.roll(x, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))
-        else:
-            shifted_x = x
-
         # FFN
-        shifted_x = shifted_x + self.drop_path(self.norm2(self.mlp(shifted_x)))
-
-        # reverse cyclic shift
-        if self.sw_mlp and self.shift_size == 0:
-            x = torch.roll(shifted_x, shifts=(self.shift_size, self.shift_size), dims=(1, 2))
-        else:
-            x = shifted_x
+        x = x + self.drop_path(self.norm2(self.mlp(x)))
 
         return x
 
@@ -424,7 +410,7 @@ class BasicLayer(nn.Module):
     def __init__(self, dim, input_resolution, depth, num_heads, window_size,
                  mlp_ratio=4., qkv_bias=True, drop=0., attn_drop=0.,
                  drop_path=0., norm_layer=nn.LayerNorm, downsample=None, use_checkpoint=False,
-                 pretrained_window_size=0, pre_mlp=False, sw_mlp=False):
+                 pretrained_window_size=0, pre_mlp=False):
 
         super().__init__()
         self.dim = dim
@@ -443,8 +429,7 @@ class BasicLayer(nn.Module):
                                  drop=drop, attn_drop=attn_drop,
                                  drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path,
                                  norm_layer=norm_layer,
-                                 pretrained_window_size=pretrained_window_size,
-                                 sw_mlp=sw_mlp)
+                                 pretrained_window_size=pretrained_window_size)
             for i in range(depth)])
 
         # patch merging layer
@@ -582,7 +567,7 @@ class SwinTransformerV2(nn.Module):
                  window_size=7, mlp_ratio=4., qkv_bias=True,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
                  norm_layer=nn.LayerNorm, ape=False, patch_norm=True,
-                 use_checkpoint=False, pretrained_window_sizes=[0, 0, 0, 0], pre_mlp=False, sw_mlp=False, **kwargs):
+                 use_checkpoint=False, pretrained_window_sizes=[0, 0, 0, 0], pre_mlp=False, **kwargs):
         super().__init__()
 
         self.num_classes = num_classes
@@ -628,8 +613,7 @@ class SwinTransformerV2(nn.Module):
                                downsample=PatchMerging if (i_layer < self.num_layers - 1) else None,
                                use_checkpoint=use_checkpoint,
                                pretrained_window_size=pretrained_window_sizes[i_layer],
-                               pre_mlp=pre_mlp,
-                               sw_mlp=sw_mlp)
+                               pre_mlp=pre_mlp)
             self.layers.append(layer)
 
         self.norm = norm_layer(self.num_features)
