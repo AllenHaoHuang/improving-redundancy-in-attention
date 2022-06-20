@@ -4,6 +4,11 @@
 # Licensed under The MIT License [see LICENSE for details]
 # Written by Ze Liu
 # --------------------------------------------------------
+# + QK Weight Residual
+# + Continuous Relative Position Weight
+# + Pre MLP (Experimental)
+# Edited by Allen Huang
+# --------------------------------------------------------
 
 import torch
 import torch.nn as nn
@@ -11,6 +16,7 @@ import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 import numpy as np
+import math
 
 
 class Mlp(nn.Module):
@@ -64,6 +70,37 @@ def window_reverse(windows, window_size, H, W):
     return x
 
 
+# same implementation as standard linear layer, different to allow different weight initialization
+class CustomLinear(nn.Module):
+    def __init__(self, in_features, out_features, bias=True,
+                 device=None, dtype=None) -> None:
+        factory_kwargs = {'device': device, 'dtype': dtype}
+        super(CustomLinear, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.weight = nn.Parameter(torch.empty((out_features, in_features), **factory_kwargs))
+        if bias:
+            self.bias = nn.Parameter(torch.empty(out_features, **factory_kwargs))
+        else:
+            self.register_parameter('bias', None)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
+            nn.init.uniform_(self.bias, -bound, bound)
+
+    def forward(self, input):
+        return F.linear(input, self.weight, self.bias)
+
+    def extra_repr(self) -> str:
+        return 'in_features={}, out_features={}, bias={}'.format(
+            self.in_features, self.out_features, self.bias is not None
+        )
+
+
 class WindowAttention(nn.Module):
     r""" Window based multi-head self attention (W-MSA) module with relative position bias.
     It supports both of shifted and non-shifted window.
@@ -90,9 +127,9 @@ class WindowAttention(nn.Module):
         self.logit_scale = nn.Parameter(torch.log(10 * torch.ones((num_heads, 1, 1))), requires_grad=True)
 
         # mlp to generate continuous relative position weight
-        self.cpw_mlp = nn.Sequential(nn.Linear(2, 512, bias=True),
+        self.cpw_mlp = nn.Sequential(CustomLinear(2, 512, bias=True),
                                      nn.ReLU(inplace=True),
-                                     nn.Linear(512, num_heads, bias=False))
+                                     CustomLinear(512, num_heads, bias=False))
 
         # mlp to generate continuous relative position bias
         self.cpb_mlp = nn.Sequential(nn.Linear(2, 512, bias=True),
@@ -167,7 +204,6 @@ class WindowAttention(nn.Module):
         relative_position_weight = relative_position_weight_table[self.relative_position_index.view(-1)].view(
             self.window_size[0] * self.window_size[1], self.window_size[0] * self.window_size[1], -1)  # Wh*Ww,Wh*Ww,nH
         relative_position_weight = relative_position_weight.permute(2, 0, 1).contiguous()  # nH, Wh*Ww, Wh*Ww
-        # relative_position_weight = 16 * torch.sigmoid(relative_position_weight)
         attn = attn * (logit_scale + relative_position_weight)
 
         relative_position_bias_table = self.cpb_mlp(self.relative_coords_table).view(-1, self.num_heads)
@@ -628,6 +664,10 @@ class SwinTransformerV2(nn.Module):
         if isinstance(m, nn.Linear):
             trunc_normal_(m.weight, std=.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, CustomLinear):
+            trunc_normal_(m.weight, std=.0002)
+            if isinstance(m, CustomLinear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
             nn.init.constant_(m.bias, 0)

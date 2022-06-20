@@ -3,7 +3,7 @@ DATA:
 MODEL:
   TYPE: swinv2
   NAME: swinv2_tiny_patch4_window8_256_premlp1_msamlp1
-  DROP_PATH_RATE: 0.0
+  DROP_PATH_RATE: 0.1
   SWINV2:
     EMBED_DIM: 384
     NUM_HEADS: [ 12 ]
