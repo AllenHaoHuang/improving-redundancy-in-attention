@@ -558,6 +558,9 @@ class SwinTransformer(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool1d(1)
         self.head = nn.Linear(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
 
+        self.pre_mlp = Mlp(in_features=embed_dim, hidden_features=int(embed_dim * mlp_ratio), act_layer=nn.GELU, drop=0)
+        self.pre_norm = norm_layer(embed_dim)
+
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
@@ -583,6 +586,9 @@ class SwinTransformer(nn.Module):
             x = x + self.absolute_pos_embed
         x = self.pos_drop(x)
 
+        # pre mlp
+        x = self.pre_mlp(self.pre_norm(x)) + x
+
         for layer in self.layers:
             x = layer(x)
 
@@ -599,15 +605,11 @@ class SwinTransformer(nn.Module):
     def flops(self):
         flops = 0
         flops += self.patch_embed.flops()
+        # pre mlp
+        flops += 2 * self.patches_resolution[0] * self.patches_resolution[
+            1] * self.embed_dim * self.embed_dim * self.mlp_ratio
         for i, layer in enumerate(self.layers):
             flops += layer.flops()
         flops += self.num_features * self.patches_resolution[0] * self.patches_resolution[1] // (2 ** self.num_layers)
         flops += self.num_features * self.num_classes
         return flops
-
-
-if __name__ == "__main__":
-    torch.random.manual_seed(0)
-    model = SwinTransformer()
-    input = torch.randn(32, 3, 224, 224)
-    print(model.forward(input))
