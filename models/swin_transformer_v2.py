@@ -127,6 +127,7 @@ class WindowAttention(nn.Module):
         self.logit_scale = nn.Parameter(torch.log(10 * torch.ones((num_heads, 1, 1))), requires_grad=True)
 
         # mlp to generate continuous relative position weight
+        # TODO fix initialization to zero function
         self.cpw_mlp = nn.Sequential(CustomLinear(2, 512, bias=True),
                                      nn.ReLU(inplace=True),
                                      CustomLinear(512, num_heads, bias=False))
